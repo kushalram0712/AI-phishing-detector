@@ -50,19 +50,43 @@ def serve_frontend():
 def predict_phishing(request: URLRequest):
     url_lower = request.url.lower()
     
-    # Hard Guardrail Check
+    # 1. HARD GUARDRAIL
     suspicious_words = ['login', 'verify', 'update', 'secure', 'account', 'banking']
     has_keyword = any(word in url_lower for word in suspicious_words)
     
     if url_lower.startswith('http://') and has_keyword:
-        return {"url": request.url, "status": "DANGER", "message": "Blocked by Guardrail (Insecure URL with sensitive keywords)."}
+        return {
+            "url": request.url, 
+            "status": "DANGER", 
+            "risk_score": 100, # Max risk
+            "message": "Blocked by Guardrail (Insecure URL with sensitive keywords).",
+            "breakdown": {"Keyword Threat": 100, "Structural Threat": 50, "Security Protocol": 100}
+        }
     
-    # Machine Learning Check
+    # 2. MACHINE LEARNING ANALYSIS
     features = extract_features(request.url)
     features_df = pd.DataFrame([features])
-    prediction = model.predict(features_df)[0]
     
-    if prediction == 1:
-        return {"url": request.url, "status": "DANGER", "message": "Phishing detected by AI analysis!"}
-    else:
-        return {"url": request.url, "status": "SAFE", "message": "Looks legitimate."}
+    # Use predict_proba to get the percentage of trees that voted "Phishing"
+    probability = model.predict_proba(features_df)[0][1] 
+    risk_score = round(probability * 100, 1)
+    
+    # Generate mock breakdown data based on our extracted features for the graph
+    structural_threat = min((features['count_dots'] + features['count_hyphens']) * 15, 100)
+    protocol_threat = 0 if features['is_https'] else 50
+    keyword_threat = features['has_suspicious_word'] * 100
+
+    status = "DANGER" if risk_score > 50 else "SAFE"
+    message = "Phishing detected by AI analysis!" if status == "DANGER" else "Domain appears legitimate."
+
+    return {
+        "url": request.url, 
+        "status": status, 
+        "risk_score": risk_score,
+        "message": message,
+        "breakdown": {
+            "Keyword Threat": keyword_threat,
+            "Structural Threat": structural_threat,
+            "Security Protocol": protocol_threat
+        }
+    }

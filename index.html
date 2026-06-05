@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Threat Intelligence | Phishing Scanner</title>
+    <title>AI Threat Intelligence Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Smooth fading animation for the results box */
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <style>
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(-10px); }
@@ -14,64 +13,63 @@
         }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-200 min-h-screen flex flex-col items-center py-12 px-4">
+<body class="bg-slate-900 text-slate-200 min-h-screen p-8">
 
-    <div class="w-full max-w-2xl text-center mb-10">
-        <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 mb-2">
-            AI Phishing Detector
-        </h1>
-        <p class="text-slate-400">Advanced Machine Learning URL Analysis</p>
-    </div>
-
-    <div class="w-full max-w-2xl bg-slate-800 rounded-2xl shadow-2xl p-8 border border-slate-700">
-        
-        <div class="flex flex-col sm:flex-row gap-4 mb-2">
-            <input type="text" id="urlInput" placeholder="Enter URL to analyze (e.g., https://example.com)" 
-                   class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition">
-            
-            <button onclick="scanUrl()" id="scanBtn"
-                    class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-8 rounded-lg transition duration-200 flex items-center justify-center min-w-[140px]">
-                <span>Analyze</span>
-            </button>
+    <div class="max-w-4xl mx-auto">
+        <div class="text-center mb-10">
+            <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 mb-2">
+                DeepScan AI
+            </h1>
+            <p class="text-slate-400">Enterprise Phishing & Threat Analysis</p>
         </div>
-        <p class="text-xs text-slate-500 ml-1">Powered by Random Forest Classifier</p>
 
-        <div id="resultCard" class="mt-8 hidden fade-in rounded-xl p-6 border">
-            <div class="flex items-center gap-4">
-                <div id="statusIcon" class="text-4xl"></div>
-                <div>
-                    <h2 id="statusTitle" class="text-2xl font-bold uppercase tracking-wide"></h2>
-                    <p id="statusMessage" class="text-slate-300 mt-1"></p>
-                    <p id="scannedUrlDisplay" class="text-sm font-mono mt-2 opacity-75 truncate max-w-md"></p>
-                </div>
+        <div class="bg-slate-800 rounded-2xl shadow-xl p-6 border border-slate-700 mb-8">
+            <div class="flex gap-4">
+                <input type="text" id="urlInput" placeholder="Enter target URL..." 
+                       class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition">
+                <button onclick="scanUrl()" id="scanBtn"
+                        class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-lg transition">
+                    Scan Target
+                </button>
             </div>
         </div>
 
+        <div id="resultDashboard" class="hidden fade-in grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <div class="col-span-1 bg-slate-800 rounded-2xl p-6 border border-slate-700 flex flex-col items-center justify-center text-center">
+                <h3 class="text-slate-400 text-sm uppercase tracking-wider mb-2">Risk Score</h3>
+                <div id="scoreCircle" class="w-32 h-32 rounded-full border-8 flex items-center justify-center mb-4 transition-colors duration-500">
+                    <span id="scoreText" class="text-4xl font-black">--%</span>
+                </div>
+                <h2 id="statusTitle" class="text-xl font-bold tracking-wide"></h2>
+                <p id="statusMessage" class="text-sm text-slate-400 mt-2"></p>
+            </div>
+
+            <div class="col-span-2 bg-slate-800 rounded-2xl p-6 border border-slate-700">
+                <h3 class="text-slate-400 text-sm uppercase tracking-wider mb-4">Threat Vector Breakdown</h3>
+                <div class="relative h-48 w-full">
+                    <canvas id="threatChart"></canvas>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
+        let threatChartInstance = null;
+
         async function scanUrl() {
-            const urlInput = document.getElementById('urlInput');
-            const url = urlInput.value.trim();
-            const resultCard = document.getElementById('resultCard');
-            const statusTitle = document.getElementById('statusTitle');
-            const statusMessage = document.getElementById('statusMessage');
-            const statusIcon = document.getElementById('statusIcon');
-            const urlDisplay = document.getElementById('scannedUrlDisplay');
+            const url = document.getElementById('urlInput').value.trim();
+            const dashboard = document.getElementById('resultDashboard');
             const scanBtn = document.getElementById('scanBtn');
+            
+            if (!url) return alert("Please enter a URL.");
 
-            if (!url) {
-                alert("Please enter a URL to scan.");
-                return;
-            }
-
-            // Set Loading UI
+            // Loading state
             scanBtn.disabled = true;
-            scanBtn.innerHTML = `<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
-            resultCard.classList.add('hidden');
+            scanBtn.innerText = "Analyzing...";
+            dashboard.classList.add('hidden');
 
             try {
-                // Call your Python FastAPI Backend
                 const response = await fetch('/predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -79,36 +77,80 @@
                 });
                 
                 const data = await response.json();
-
-                // Reset styling classes
-                resultCard.className = "mt-8 fade-in rounded-xl p-6 border flex flex-col";
-                
-                urlDisplay.innerText = "Target: " + data.url;
-
-                // Apply Danger or Safe UI themes based on AI response
-                if (data.status === "DANGER") {
-                    resultCard.classList.add('bg-red-900/30', 'border-red-500/50');
-                    statusTitle.innerText = "Phishing Threat Detected";
-                    statusTitle.classList.add('text-red-400');
-                    statusMessage.innerText = data.message;
-                    statusIcon.innerText = "🚨";
-                } else {
-                    resultCard.classList.add('bg-emerald-900/30', 'border-emerald-500/50');
-                    statusTitle.innerText = "Safe Domain";
-                    statusTitle.classList.add('text-emerald-400');
-                    statusMessage.innerText = data.message;
-                    statusIcon.innerText = "✅";
-                }
-
-                resultCard.classList.remove('hidden');
+                updateDashboard(data);
+                dashboard.classList.remove('hidden');
 
             } catch (error) {
-                alert("Connection Error: Make sure your Python server is running!");
+                alert("Server error. Is the backend running?");
             } finally {
-                // Reset Button
                 scanBtn.disabled = false;
-                scanBtn.innerHTML = `<span>Analyze</span>`;
+                scanBtn.innerText = "Scan Target";
             }
+        }
+
+        function updateDashboard(data) {
+            // 1. Update Score & Colors
+            const scoreCircle = document.getElementById('scoreCircle');
+            const scoreText = document.getElementById('scoreText');
+            const statusTitle = document.getElementById('statusTitle');
+            const statusMessage = document.getElementById('statusMessage');
+
+            scoreText.innerText = data.risk_score + "%";
+            statusMessage.innerText = data.message;
+
+            if (data.status === "DANGER") {
+                scoreCircle.className = "w-32 h-32 rounded-full border-8 border-red-500 text-red-500 flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(239,68,68,0.3)]";
+                statusTitle.innerText = "CRITICAL THREAT";
+                statusTitle.className = "text-xl font-bold tracking-wide text-red-400";
+            } else {
+                scoreCircle.className = "w-32 h-32 rounded-full border-8 border-emerald-500 text-emerald-500 flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(16,185,129,0.3)]";
+                statusTitle.innerText = "SAFE DOMAIN";
+                statusTitle.className = "text-xl font-bold tracking-wide text-emerald-400";
+            }
+
+            // 2. Update Graph
+            updateChart(data.breakdown);
+        }
+
+        function updateChart(breakdownData) {
+            const ctx = document.getElementById('threatChart').getContext('2d');
+            
+            // Destroy old chart if it exists so we can draw a new one
+            if (threatChartInstance) threatChartInstance.destroy();
+
+            threatChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(breakdownData),
+                    datasets: [{
+                        label: 'Risk Level',
+                        data: Object.values(breakdownData),
+                        backgroundColor: 'rgba(99, 102, 241, 0.6)', // Indigo bar color
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            max: 100,
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: '#94a3b8' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
         }
     </script>
 </body>
