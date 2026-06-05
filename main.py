@@ -14,10 +14,27 @@ class URLRequest(BaseModel):
 
 # --- ADD THIS NEW ROUTE ---
 @app.get("/")
-def serve_frontend():
-    return FileResponse("index.html")
-# --------------------------
-
-# (Keep your existing extract_features function here)
-
-# (Keep your existing @app.post("/predict") route here)
+@app.post("/predict")
+def predict_phishing(request: URLRequest):
+    url_lower = request.url.lower()
+    
+    # 1. HARD GUARDRAIL: Catch highly obvious HTTP phishing patterns instantly
+    suspicious_words = ['login', 'verify', 'update', 'secure', 'account', 'banking']
+    has_keyword = any(word in url_lower for word in suspicious_words)
+    
+    if url_lower.startswith('http://') and has_keyword:
+        return {
+            "url": request.url, 
+            "status": "DANGER", 
+            "message": "Blocked by Threat Intelligence Guardrail (Insecure URL containing sensitive keywords)."
+        }
+    
+    # 2. MACHINE LEARNING PIPELINE: If it passes the guardrail, let the AI analyze it
+    features = extract_features(request.url)
+    features_df = pd.DataFrame([features])
+    prediction = model.predict(features_df)[0]
+    
+    if prediction == 1:
+        return {"url": request.url, "status": "DANGER", "message": "Phishing detected by AI analysis!"}
+    else:
+        return {"url": request.url, "status": "SAFE", "message": "Looks legitimate."}
